@@ -8,7 +8,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body
-    class="min-h-screen bg-stone-50 text-stone-900 antialiased"
+    class="min-h-screen flex flex-col bg-stone-50 text-stone-900 antialiased"
     data-page="@yield('shop-page')"
     @stack('body-data')
 >
@@ -19,9 +19,9 @@
             </a>
             <nav class="flex flex-wrap items-center gap-2 text-sm">
                 <a href="{{ route('shop.index') }}" class="rounded-md px-3 py-2 text-stone-700 hover:bg-stone-100">Каталог</a>
-                <a href="{{ route('shop.cart') }}" class="rounded-md px-3 py-2 text-stone-700 hover:bg-stone-100">Корзина</a>
-                <a href="{{ route('shop.favorites') }}" class="rounded-md px-3 py-2 text-stone-700 hover:bg-stone-100">Избранное</a>
-                <a href="{{ route('shop.orders') }}" class="rounded-md px-3 py-2 text-stone-700 hover:bg-stone-100">Заказы</a>
+                <a href="{{ route('shop.cart') }}" data-auth-only class="hidden rounded-md px-3 py-2 text-stone-700 hover:bg-stone-100">Корзина</a>
+                <a href="{{ route('shop.favorites') }}" data-auth-only class="hidden rounded-md px-3 py-2 text-stone-700 hover:bg-stone-100">Избранное</a>
+                <a href="{{ route('shop.orders') }}" data-auth-only class="hidden rounded-md px-3 py-2 text-stone-700 hover:bg-stone-100">Заказы</a>
                 <a id="shop-nav-settings" href="{{ route('shop.settings') }}" class="hidden rounded-md px-3 py-2 text-stone-700 hover:bg-stone-100">Настройки</a>
                 <a id="shop-nav-admin" href="{{ route('admin.dashboard') }}" class="hidden rounded-md px-3 py-2 font-medium text-violet-800 hover:bg-violet-50">Админка</a>
                 <span id="shop-nav-auth" class="flex items-center gap-2 border-l border-stone-200 pl-3 ml-1">
@@ -34,13 +34,15 @@
         </div>
     </header>
 
-    <main class="mx-auto max-w-6xl px-4 py-8">
+    <main class="flex-1 mx-auto max-w-6xl px-4 py-8 w-full">
         <div id="shop-alert" class="mb-6 hidden rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert"></div>
         @yield('content')
     </main>
 
     <footer class="mt-auto border-t border-stone-200 bg-white py-6 text-center text-sm text-stone-500">
-        {{ config('app.name') }} · REST API <code class="rounded bg-stone-100 px-1">/api/v1</code>
+        {{ config('app.name') }} · Книжный магазин &copy; {{ date('Y') }}
+        <br>
+        <code class="rounded bg-stone-100 px-1">/api/v1</code>
     </footer>
 </body>
 </html>

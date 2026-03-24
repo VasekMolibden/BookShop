@@ -103,6 +103,9 @@ async function refreshNav() {
         registerEl.classList.remove('hidden');
         userEl.textContent = '';
         document.getElementById('shop-nav-settings')?.classList.add('hidden');
+        document.querySelectorAll('[data-auth-only]').forEach(el => {
+            el.classList.add('hidden');
+        });
         return;
     }
 
@@ -134,6 +137,10 @@ async function refreshNav() {
                 settingsLink.classList.add('hidden');
             }
         }
+
+        document.querySelectorAll('[data-auth-only]').forEach(el => {
+            el.classList.remove('hidden');
+        });
     } catch {
         clearToken();
         userEl.classList.add('hidden');
@@ -141,6 +148,9 @@ async function refreshNav() {
         loginEl.classList.remove('hidden');
         registerEl.classList.remove('hidden');
         document.getElementById('shop-nav-settings')?.classList.add('hidden');
+        document.querySelectorAll('[data-auth-only]').forEach(el => {
+            el.classList.add('hidden');
+        });
     }
 }
 
@@ -663,6 +673,7 @@ function initCart() {
 function initOrders() {
     const guest = document.getElementById('orders-guest');
     const loading = document.getElementById('orders-loading');
+    const empty = document.getElementById('orders-empty');
     const list = document.getElementById('orders-list');
     const pagEl = document.getElementById('orders-pagination');
     const alertEl = document.getElementById('shop-alert');
@@ -682,6 +693,7 @@ function initOrders() {
     async function load() {
         hideAlert(alertEl);
         loading?.classList.remove('hidden');
+        empty?.classList.add('hidden');
         list.classList.add('hidden');
 
         try {
@@ -690,6 +702,13 @@ function initOrders() {
             const pagination = res.data?.pagination;
 
             loading?.classList.add('hidden');
+
+            if (!orders.length) {
+                empty?.classList.remove('hidden');
+                pagEl.innerHTML = '';
+                return;
+            }
+
             list.classList.remove('hidden');
             list.innerHTML = '';
 
