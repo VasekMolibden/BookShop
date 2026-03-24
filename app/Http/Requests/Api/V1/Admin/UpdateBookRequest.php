@@ -47,7 +47,7 @@ class UpdateBookRequest extends FormRequest
                 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
                 Rule::unique('books', 'slug')->ignore($book->id),
             ],
-            'author' => ['sometimes', 'string', 'max:255'],
+            'author_id' => ['sometimes', 'integer', 'exists:authors,id'],
             'description' => ['nullable', 'string', 'max:20000'],
             'price' => ['sometimes', 'numeric', 'min:0'],
             'isbn' => ['nullable', 'string', 'max:32', Rule::unique('books', 'isbn')->ignore($book->id)],

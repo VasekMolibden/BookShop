@@ -31,9 +31,16 @@ class ReviewResource extends JsonResource
                 ];
             }),
             'book' => $this->whenLoaded('book', function () {
+                // Get author name from database field or relation
+                $authorName = $this->book->getRawOriginal('author');
+                if (!$authorName && $this->book->relationLoaded('author') && $this->book->author) {
+                    $authorName = $this->book->author->name;
+                }
+
                 return [
                     'id' => $this->book->id,
                     'title' => $this->book->title,
+                    'author' => $authorName ?: 'Неизвестный автор',
                 ];
             }),
         ];

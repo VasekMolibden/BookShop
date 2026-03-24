@@ -126,9 +126,10 @@ class AuthController extends Controller
      */
     public function updateProfile(UpdateProfileRequest $request): JsonResponse
     {
+        // Email change is forbidden from UI and backend.
         $user = $this->authService->updateProfile(
             $request->user(),
-            $request->safe()->only(['name', 'email'])
+            $request->safe()->only(['name'])
         );
 
         return ApiResponse::success([

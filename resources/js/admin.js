@@ -370,7 +370,131 @@ function initAdminOrders() {
 
     void load();
 }
+function initAdminAuthors() {
+    const tbody = document.getElementById('authors-tbody');
+    const loading = document.getElementById('authors-loading');
+    const form = document.getElementById('author-form');
+    const idInput = document.getElementById('author-id');
+    const nameInput = document.getElementById('author-name');
+    const slugInput = document.getElementById('author-slug');
+    const bioInput = document.getElementById('author-bio');
+    const submitBtn = document.getElementById('author-submit');
+    const alertEl = document.getElementById('admin-alert');
 
+    if (!tbody || !form) {
+        return;
+    }
+
+    async function loadTable() {
+        hideAdminAlert(alertEl);
+        loading?.classList.remove('hidden');
+        try {
+            const res = await api('/authors', { auth: false });
+            const authors = res.data?.authors ?? [];
+            tbody.innerHTML = '';
+            for (const a of authors) {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-100';
+                tr.innerHTML = `
+                    <td class="px-4 py-2 font-mono text-xs text-slate-500">${a.id}</td>
+                    <td class="px-4 py-2">${escapeHtml(a.name)}</td>
+                    <td class="px-4 py-2 font-mono text-xs">${escapeHtml(a.slug)}</td>
+                    <td class="px-4 py-2">${a.books_count || 0}</td>
+                    <td class="px-4 py-2 text-right">
+                        <button type="button" class="text-violet-700 hover:underline" data-edit="${a.id}">Изменить</button>
+                        <button type="button" class="ml-2 text-red-700 hover:underline" data-del="${a.id}">Удалить</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            }
+
+            tbody.querySelectorAll('[data-edit]').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const id = Number(btn.getAttribute('data-edit'));
+                    const author = authors.find((x) => x.id === id);
+                    if (author && idInput && nameInput && slugInput && bioInput && submitBtn) {
+                        idInput.value = String(author.id);
+                        nameInput.value = author.name;
+                        slugInput.value = author.slug;
+                        bioInput.value = author.bio || '';
+                        submitBtn.textContent = 'Обновить';
+                    }
+                });
+            });
+
+            tbody.querySelectorAll('[data-del]').forEach((btn) => {
+                btn.addEventListener('click', async () => {
+                    const id = btn.getAttribute('data-del');
+                    if (!confirm('Удалить автора?')) {
+                        return;
+                    }
+                    try {
+                        await api(`/admin/authors/${id}`, { method: 'DELETE' });
+                        await loadTable();
+                    } catch (e) {
+                        const err = /** @type {any} */ (e);
+                        const msg =
+                            err.payload?.error?.errors?.author?.[0] ?? err.message ?? 'Ошибка удаления';
+                        showAdminAlert(alertEl, msg);
+                    }
+                });
+            });
+        } catch (e) {
+            showAdminAlert(alertEl, e instanceof Error ? e.message : 'Ошибка загрузки');
+        }
+        loading?.classList.add('hidden');
+    }
+
+    document.getElementById('author-reset')?.addEventListener('click', () => {
+        if (idInput) {
+            idInput.value = '';
+        }
+        if (nameInput) {
+            nameInput.value = '';
+        }
+        if (slugInput) {
+            slugInput.value = '';
+        }
+        if (bioInput) {
+            bioInput.value = '';
+        }
+        if (submitBtn) {
+            submitBtn.textContent = 'Сохранить';
+        }
+    });
+
+    form.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        hideAdminAlert(alertEl);
+        const id = idInput?.value?.trim();
+        const payload = {
+            name: nameInput?.value?.trim() ?? '',
+            slug: slugInput?.value?.trim() ?? '',
+            bio: bioInput?.value?.trim() ?? '',
+        };
+        try {
+            if (id) {
+                await api(`/admin/authors/${id}`, { method: 'PATCH', json: payload });
+            } else {
+                await api('/admin/authors', { method: 'POST', json: payload });
+            }
+            document.getElementById('author-reset')?.click();
+            await loadTable();
+        } catch (e) {
+            const err = /** @type {any} */ (e);
+            const errors = err.payload?.error?.errors;
+            let msg = err.message;
+            if (errors && typeof errors === 'object') {
+                msg = Object.values(errors)
+                    .flat()
+                    .join(' ');
+            }
+            showAdminAlert(alertEl, msg);
+        }
+    });
+
+    void loadTable();
+}
 function initAdminReviews() {
     const tbody = document.getElementById('admin-reviews-tbody');
     const loading = document.getElementById('reviews-loading');
@@ -467,9 +591,29 @@ function initAdminBookForm() {
         }
     }
 
+    async function loadAuthorsSelect(selectedId = null) {
+        const authorSelect = document.getElementById('bf-author');
+        if (!authorSelect) {
+            return;
+        }
+        const res = await api('/authors', { auth: false });
+        const authors = res.data?.authors ?? [];
+        authorSelect.innerHTML = '<option value="">Выберите автора</option>';
+        for (const a of authors) {
+            const option = document.createElement('option');
+            option.value = String(a.id);
+            option.textContent = a.name;
+            if (selectedId && a.id === selectedId) {
+                option.selected = true;
+            }
+            authorSelect.appendChild(option);
+        }
+    }
+
     async function fillIfEdit() {
         if (!isEdit) {
             await loadGenresCheckboxes([]);
+            await loadAuthorsSelect();
             return;
         }
         try {
@@ -494,7 +638,7 @@ function initAdminBookForm() {
                 slug.value = b.slug ?? '';
             }
             if (author) {
-                author.value = b.author ?? '';
+                await loadAuthorsSelect(b.author_id);
             }
             if (desc) {
                 desc.value = b.description ?? '';
@@ -533,7 +677,7 @@ function initAdminBookForm() {
         /** @type {Record<string, unknown>} */
         const payload = {
             title: document.getElementById('bf-title')?.value?.trim(),
-            author: document.getElementById('bf-author')?.value?.trim(),
+            author_id: Number(document.getElementById('bf-author')?.value),
             description: document.getElementById('bf-description')?.value?.trim() || null,
             price: Number(document.getElementById('bf-price')?.value),
             stock: Number(document.getElementById('bf-stock')?.value),
@@ -859,6 +1003,9 @@ export async function initAdmin() {
     switch (page) {
         case 'admin-genres':
             initAdminGenres();
+            break;
+        case 'admin-authors':
+            initAdminAuthors();
             break;
         case 'admin-books':
             initAdminBooks();

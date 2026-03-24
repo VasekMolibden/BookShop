@@ -41,7 +41,7 @@
         </div>
 
         <section class="mt-10">
-            <h2 class="text-xl font-semibold text-stone-900">Отзывы</h2>
+            <h2 class="text-xl font-semibold text-stone-900"><a href="#book-reviews">Отзывы</a></h2>
             <form id="review-form" class="mt-4 hidden rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
                 <p class="text-sm font-medium text-stone-800">Оставить отзыв</p>
                 <label class="mt-2 block text-sm text-stone-600">Оценка (1–5)</label>

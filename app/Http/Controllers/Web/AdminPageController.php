@@ -28,6 +28,14 @@ class AdminPageController extends Controller
     }
 
     /**
+     * Author management.
+     */
+    public function authors(): View
+    {
+        return view('admin.authors');
+    }
+
+    /**
      * Book list.
      */
     public function books(): View

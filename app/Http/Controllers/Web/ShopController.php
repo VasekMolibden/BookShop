@@ -103,4 +103,12 @@ class ShopController extends Controller
     {
         return view('shop.favorites');
     }
+
+    /**
+     * User reviews (requires Bearer token on the client).
+     */
+    public function reviews(): View
+    {
+        return view('shop.reviews');
+    }
 }

@@ -36,7 +36,7 @@ class StoreBookRequest extends FormRequest
         return [
             'title' => ['required', 'string', 'max:500'],
             'slug' => ['nullable', 'string', 'max:500', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', 'unique:books,slug'],
-            'author' => ['required', 'string', 'max:255'],
+            'author_id' => ['required', 'integer', 'exists:authors,id'],
             'description' => ['nullable', 'string', 'max:20000'],
             'price' => ['required', 'numeric', 'min:0'],
             'isbn' => ['nullable', 'string', 'max:32', Rule::unique('books', 'isbn')],

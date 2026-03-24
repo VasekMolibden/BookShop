@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Admin\AuthorController as AdminAuthorController;
 use App\Http\Controllers\Api\V1\Admin\BookController as AdminBookController;
 use App\Http\Controllers\Api\V1\Admin\BookImageController as AdminBookImageController;
 use App\Http\Controllers\Api\V1\Admin\GenreController as AdminGenreController;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/health', [HealthController::class, 'index']);
 
 Route::get('/genres', [GenreController::class, 'index']);
+Route::get('/authors', [AdminAuthorController::class, 'index']);
 Route::get('/books', [BookController::class, 'index']);
 Route::get('/books/{book}/reviews', [ReviewController::class, 'index']);
 Route::get('/books/{book}', [BookController::class, 'show']);
@@ -47,6 +49,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/favorites', [FavoriteController::class, 'store']);
     Route::delete('/favorites/{book}', [FavoriteController::class, 'destroy']);
 
+    Route::get('/reviews', [ReviewController::class, 'userReviews']);
     Route::post('/reviews', [ReviewController::class, 'store']);
     Route::patch('/reviews/{review}', [ReviewController::class, 'update']);
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy']);
@@ -60,6 +63,11 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
         Route::get('/reviews', [AdminReviewController::class, 'index']);
         Route::delete('/reviews/{review}', [AdminReviewController::class, 'destroy']);
+
+        Route::get('/authors', [AdminAuthorController::class, 'index']);
+        Route::post('/authors', [AdminAuthorController::class, 'store']);
+        Route::patch('/authors/{author}', [AdminAuthorController::class, 'update']);
+        Route::delete('/authors/{author}', [AdminAuthorController::class, 'destroy']);
 
         Route::post('/genres', [AdminGenreController::class, 'store']);
         Route::patch('/genres/{genre}', [AdminGenreController::class, 'update']);

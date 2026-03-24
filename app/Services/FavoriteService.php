@@ -18,7 +18,7 @@ class FavoriteService
 
         return Favorite::query()
             ->where('user_id', $user->id)
-            ->with(['book.genres'])
+            ->with(['book.genres', 'book.author'])
             ->orderByDesc('id')
             ->paginate($perPage);
     }
@@ -35,7 +35,7 @@ class FavoriteService
             ],
         );
 
-        return $favorite->load(['book.genres']);
+        return $favorite->load(['book.genres', 'book.author']);
     }
 
     /**

@@ -22,7 +22,9 @@
         <input type="text" id="bf-slug" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" class="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm" placeholder="оставьте пустым при создании">
 
         <label class="block text-sm font-medium text-slate-700">Автор *</label>
-        <input type="text" id="bf-author" required class="w-full rounded-lg border border-slate-300 px-3 py-2">
+        <select id="bf-author" required class="w-full rounded-lg border border-slate-300 px-3 py-2">
+            <option value="">Выберите автора</option>
+        </select>
 
         <label class="block text-sm font-medium text-slate-700">Описание</label>
         <textarea id="bf-description" rows="5" class="w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>

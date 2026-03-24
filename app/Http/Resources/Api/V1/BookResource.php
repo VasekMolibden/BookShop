@@ -18,17 +18,25 @@ class BookResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        // Get author name from database field or relation
+        $authorName = $this->getRawOriginal('author');
+        if (!$authorName && $this->relationLoaded('author') && $this->author) {
+            $authorName = $this->author->name;
+        }
+
         return [
             'id' => $this->id,
             'title' => $this->title,
             'slug' => $this->slug,
-            'author' => $this->author,
+            'author' => $authorName ?: 'Неизвестный автор',
+            'author_data' => $this->when($this->relationLoaded('author'), AuthorResource::make($this->getRelation('author'))),
             'description' => $this->description,
             'price' => $this->price,
             'isbn' => $this->isbn,
             'stock' => $this->stock,
             'published_at' => $this->published_at?->toDateString(),
             'reviews_count' => $this->whenCounted('reviews'),
+            'average_rating' => $this->when($this->reviews_count > 0, round($this->average_rating, 1)),
             'genres' => GenreResource::collection($this->whenLoaded('genres')),
             'images' => BookImageResource::collection($this->whenLoaded('images')),
         ];

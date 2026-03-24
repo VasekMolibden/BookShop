@@ -16,6 +16,12 @@
             </a>
         </li>
         <li>
+            <a href="{{ route('admin.authors') }}" class="block rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-violet-300">
+                <h2 class="font-semibold text-slate-900">Авторы</h2>
+                <p class="mt-1 text-sm text-slate-600">Управление авторами книг</p>
+            </a>
+        </li>
+        <li>
             <a href="{{ route('admin.books') }}" class="block rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-violet-300">
                 <h2 class="font-semibold text-slate-900">Книги</h2>
                 <p class="mt-1 text-sm text-slate-600">Каталог и карточки товаров</p>

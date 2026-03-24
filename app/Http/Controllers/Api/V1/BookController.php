@@ -40,7 +40,7 @@ class BookController extends Controller
      */
     public function show(Book $book): JsonResponse
     {
-        $book->load(['genres:id,name,slug', 'images']);
+        $book->load(['genres:id,name,slug', 'images', 'author:id,name,slug']);
         $book->loadCount('reviews');
 
         return ApiResponse::success([

@@ -2,6 +2,7 @@
 
 namespace App\Services\Admin;
 
+use App\Models\Author;
 use App\Models\Book;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
@@ -22,10 +23,17 @@ class AdminBookService
             $attributes['slug'] = $this->uniqueSlugFromTitle((string) $attributes['title']);
         }
 
+        if (!empty($attributes['author_id']) && empty($attributes['author'])) {
+            $author = Author::find($attributes['author_id']);
+            if ($author) {
+                $attributes['author'] = $author->name;
+            }
+        }
+
         $book = Book::query()->create($attributes);
         $book->genres()->sync($genreIds);
 
-        return $book->load(['genres:id,name,slug']);
+        return $book->load(['genres:id,name,slug', 'author:id,name']);
     }
 
     /**
@@ -44,6 +52,13 @@ class AdminBookService
             );
         }
 
+        if (!empty($data['author_id']) && empty($data['author'])) {
+            $author = Author::find($data['author_id']);
+            if ($author) {
+                $data['author'] = $author->name;
+            }
+        }
+
         $book->fill($data);
         $book->save();
 
@@ -51,7 +66,7 @@ class AdminBookService
             $book->genres()->sync($genreIds);
         }
 
-        return $book->fresh(['genres:id,name,slug']);
+        return $book->load(['genres:id,name,slug', 'author:id,name']);
     }
 
     /**

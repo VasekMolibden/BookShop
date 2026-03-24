@@ -1,6 +1,9 @@
 import { api, clearToken, getToken, setToken } from './api';
 import { initBookCarousel } from './carousel';
 
+/** @type {number|null} */
+let alertTimerId = null;
+
 /**
  * @param {string} text
  */
@@ -29,6 +32,22 @@ function formatDateTime(iso) {
 }
 
 /**
+ * @param {number} count
+ */
+function formatReviewsCount(count) {
+    const n = Math.abs(Math.trunc(Number(count) || 0));
+    const mod10 = n % 10;
+    const mod100 = n % 100;
+    if (mod10 === 1 && mod100 !== 11) {
+        return `${n} отзыв`;
+    }
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+        return `${n} отзыва`;
+    }
+    return `${n} отзывов`;
+}
+
+/**
  * @param {HTMLElement|null} el
  * @param {string} message
  * @param {'error'|'success'} [variant]
@@ -37,7 +56,12 @@ function showAlert(el, message, variant = 'error') {
     if (!el) {
         return;
     }
-    el.textContent = message;
+    const messageEl = document.getElementById('shop-alert-message');
+    if (messageEl) {
+        messageEl.textContent = message;
+    } else {
+        el.textContent = message;
+    }
     el.classList.remove('hidden');
     if (variant === 'success') {
         el.classList.remove('border-red-200', 'bg-red-50', 'text-red-800');
@@ -46,13 +70,35 @@ function showAlert(el, message, variant = 'error') {
         el.classList.remove('border-emerald-200', 'bg-emerald-50', 'text-emerald-800');
         el.classList.add('border-red-200', 'bg-red-50', 'text-red-800');
     }
+
+    if (alertTimerId) {
+        window.clearTimeout(alertTimerId);
+    }
+    alertTimerId = window.setTimeout(() => {
+        hideAlert(el);
+    }, 5000);
 }
 
 /**
  * @param {HTMLElement|null} el
  */
 function hideAlert(el) {
+    if (alertTimerId) {
+        window.clearTimeout(alertTimerId);
+        alertTimerId = null;
+    }
     el?.classList.add('hidden');
+}
+
+function initAlertClose() {
+    const alertEl = document.getElementById('shop-alert');
+    const closeBtn = document.getElementById('shop-alert-close');
+    if (!alertEl || !closeBtn) {
+        return;
+    }
+    closeBtn.addEventListener('click', () => {
+        hideAlert(alertEl);
+    });
 }
 
 /**
@@ -87,17 +133,18 @@ function renderPagination(container, pagination, onPage) {
 
 async function refreshNav() {
     const userEl = document.getElementById('shop-nav-user');
+    const userMenuEl = document.getElementById('shop-user-menu');
     const loginEl = document.getElementById('shop-nav-login');
     const registerEl = document.getElementById('shop-nav-register');
     const logoutEl = document.getElementById('shop-nav-logout');
 
-    if (!userEl || !loginEl || !registerEl || !logoutEl) {
+    if (!userEl || !loginEl || !registerEl || !logoutEl || !userMenuEl) {
         return;
     }
 
     const token = getToken();
     if (!token) {
-        userEl.classList.add('hidden');
+        userMenuEl.classList.add('hidden');
         logoutEl.classList.add('hidden');
         loginEl.classList.remove('hidden');
         registerEl.classList.remove('hidden');
@@ -106,6 +153,7 @@ async function refreshNav() {
         document.querySelectorAll('[data-auth-only]').forEach(el => {
             el.classList.add('hidden');
         });
+        void refreshCartBadge();
         return;
     }
 
@@ -114,10 +162,12 @@ async function refreshNav() {
         const user = res.data?.user;
         if (user?.name) {
             userEl.textContent = user.name;
-            userEl.classList.remove('hidden');
+            userMenuEl.classList.remove('hidden');
             logoutEl.classList.remove('hidden');
             loginEl.classList.add('hidden');
             registerEl.classList.add('hidden');
+        } else {
+            userMenuEl.classList.add('hidden');
         }
 
         const adminLink = document.getElementById('shop-nav-admin');
@@ -141,9 +191,10 @@ async function refreshNav() {
         document.querySelectorAll('[data-auth-only]').forEach(el => {
             el.classList.remove('hidden');
         });
+        void refreshCartBadge();
     } catch {
         clearToken();
-        userEl.classList.add('hidden');
+        userMenuEl.classList.add('hidden');
         logoutEl.classList.add('hidden');
         loginEl.classList.remove('hidden');
         registerEl.classList.remove('hidden');
@@ -151,13 +202,153 @@ async function refreshNav() {
         document.querySelectorAll('[data-auth-only]').forEach(el => {
             el.classList.add('hidden');
         });
+        void refreshCartBadge();
+    }
+}
+
+async function refreshCartBadge() {
+    const badgeEl = document.getElementById('shop-nav-cart-count');
+    if (!badgeEl) {
+        return;
+    }
+
+    if (!getToken()) {
+        badgeEl.classList.add('hidden');
+        return;
+    }
+
+    try {
+        const res = await api('/cart');
+        const totalQty = Number(res.data?.cart?.total_quantity ?? 0);
+        if (totalQty > 0) {
+            badgeEl.textContent = totalQty > 99 ? '99+' : String(totalQty);
+            badgeEl.classList.remove('hidden');
+        } else {
+            badgeEl.classList.add('hidden');
+        }
+    } catch {
+        badgeEl.classList.add('hidden');
     }
 }
 
 function initNav() {
     void refreshNav();
 
+    const searchWrapEl = document.getElementById('shop-nav-search');
+    const searchToggleEl = document.getElementById('shop-nav-search-toggle');
+    const searchFormEl = document.getElementById('shop-nav-search-form');
+    const searchInputEl = document.getElementById('shop-nav-search-input');
+    const searchSubmitEl = document.getElementById('shop-nav-search-submit');
+
+    const closeSearch = () => {
+        if (!searchToggleEl || !searchFormEl) {
+            return;
+        }
+        searchToggleEl.setAttribute('aria-expanded', 'false');
+        searchFormEl.classList.add('hidden');
+    };
+
+    const openSearch = () => {
+        if (!searchToggleEl || !searchFormEl) {
+            return;
+        }
+        searchToggleEl.setAttribute('aria-expanded', 'true');
+        searchFormEl.classList.remove('hidden');
+        searchInputEl?.focus();
+    };
+
+    if (searchWrapEl && searchToggleEl && searchFormEl) {
+        const runHeaderSearch = () => {
+            const query = (searchInputEl?.value ?? '').trim();
+            const target = query ? `/search?search=${encodeURIComponent(query)}` : '/search';
+            window.location.href = target;
+        };
+
+        searchToggleEl.addEventListener('click', (e) => {
+            e.preventDefault();
+            const expanded = searchToggleEl.getAttribute('aria-expanded') === 'true';
+            if (expanded) {
+                closeSearch();
+            } else {
+                openSearch();
+            }
+        });
+
+        searchFormEl.addEventListener('submit', (e) => {
+            e.preventDefault();
+            runHeaderSearch();
+        });
+
+        searchFormEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        searchInputEl?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                runHeaderSearch();
+            }
+        });
+
+        searchSubmitEl?.addEventListener('click', (e) => {
+            e.preventDefault();
+            runHeaderSearch();
+        });
+    }
+
+    const userMenuEl = document.getElementById('shop-user-menu');
+    const triggerEl = document.getElementById('shop-user-menu-trigger');
+    const dropdownEl = document.getElementById('shop-user-dropdown');
+    const arrowEl = document.getElementById('shop-user-menu-arrow');
+
+    const closeUserMenu = () => {
+        if (!triggerEl || !dropdownEl || !arrowEl) {
+            return;
+        }
+        triggerEl.setAttribute('aria-expanded', 'false');
+        dropdownEl.classList.add('hidden');
+        arrowEl.classList.remove('rotate-180');
+    };
+
+    const openUserMenu = () => {
+        if (!triggerEl || !dropdownEl || !arrowEl) {
+            return;
+        }
+        triggerEl.setAttribute('aria-expanded', 'true');
+        dropdownEl.classList.remove('hidden');
+        arrowEl.classList.add('rotate-180');
+    };
+
+    if (userMenuEl && triggerEl && dropdownEl && arrowEl) {
+        triggerEl.addEventListener('click', (e) => {
+            e.preventDefault();
+            const expanded = triggerEl.getAttribute('aria-expanded') === 'true';
+            if (expanded) {
+                closeUserMenu();
+            } else {
+                openUserMenu();
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!userMenuEl.contains(/** @type {Node} */ (e.target))) {
+                closeUserMenu();
+            }
+            if (searchWrapEl && !searchWrapEl.contains(/** @type {Node} */ (e.target))) {
+                closeSearch();
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeUserMenu();
+                closeSearch();
+            }
+        });
+    }
+
     document.getElementById('shop-nav-logout')?.addEventListener('click', async () => {
+        closeUserMenu();
         try {
             if (getToken()) {
                 await api('/auth/logout', { method: 'POST', json: {} });
@@ -186,6 +377,92 @@ function initCatalog() {
 
     let page = 1;
     const perPage = 12;
+    let favoriteBookIds = new Set();
+    let cartBookIds = new Set();
+    /** @type {Map<number, number>} */
+    let cartItemIdsByBookId = new Map();
+
+    async function loadUserState() {
+        favoriteBookIds = new Set();
+        cartBookIds = new Set();
+        cartItemIdsByBookId = new Map();
+
+        if (!getToken()) {
+            return;
+        }
+
+        try {
+            const [favRes, cartRes] = await Promise.all([
+                api('/favorites?per_page=100'),
+                api('/cart'),
+            ]);
+
+            const favs = favRes.data?.favorites ?? [];
+            for (const f of favs) {
+                if (f.book?.id) {
+                    favoriteBookIds.add(Number(f.book.id));
+                }
+            }
+
+            const cart = cartRes.data?.cart;
+            const items = cart?.items ?? [];
+            for (const item of items) {
+                if (item.book?.id) {
+                    const bookId = Number(item.book.id);
+                    cartBookIds.add(bookId);
+                    if (item.id) {
+                        cartItemIdsByBookId.set(bookId, Number(item.id));
+                    }
+                }
+            }
+        } catch {
+            // ignore
+        }
+    }
+
+    function updateCatalogButtons() {
+        list.querySelectorAll('.catalog-fav-btn').forEach((btn) => {
+            const bookId = Number(btn.getAttribute('data-book-id'));
+            if (favoriteBookIds.has(bookId)) {
+                btn.innerHTML = `
+                    <svg class="h-5 w-5 text-red-600" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                    </svg>
+                `;
+                btn.setAttribute('title', 'Убрать из избранного');
+                btn.setAttribute('aria-label', 'Убрать из избранного');
+                btn.classList.add('text-red-600', 'bg-red-50/95', 'border-red-200');
+                btn.classList.remove('bg-white/95', 'border-white/80');
+                btn.disabled = false;
+            } else {
+                btn.innerHTML = `
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                    </svg>
+                `;
+                btn.setAttribute('title', 'Добавить в избранное');
+                btn.setAttribute('aria-label', 'Добавить в избранное');
+                btn.classList.remove('text-red-600', 'bg-red-50/95', 'border-red-200');
+                btn.classList.add('bg-white/95', 'border-white/80');
+                btn.disabled = false;
+            }
+        });
+
+        list.querySelectorAll('.catalog-cart-btn').forEach((btn) => {
+            const bookId = Number(btn.getAttribute('data-book-id'));
+            if (cartBookIds.has(bookId)) {
+                btn.textContent = 'В корзине';
+                btn.classList.remove('bg-amber-800', 'hover:bg-amber-900');
+                btn.classList.add('bg-green-600', 'hover:bg-green-700');
+                btn.disabled = false;
+            } else {
+                btn.textContent = 'В корзину';
+                btn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                btn.classList.add('bg-amber-800', 'hover:bg-amber-900');
+                btn.disabled = false;
+            }
+        });
+    }
 
     async function loadGenres() {
         const res = await api('/genres', { auth: false });
@@ -244,20 +521,137 @@ function initCatalog() {
                 const imageHtml = b.primary_image && b.primary_image.url 
                     ? `<img src="${b.primary_image.url}" alt="${escapeHtml(b.primary_image.alt_text || b.title)}" class="w-full h-48 object-cover">`
                     : `<div class="w-full h-48 bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center text-4xl">📖</div>`;
+                const rating = Number(b.average_rating ?? 0);
+                const reviewsCount = Number(b.reviews_count ?? 0);
+                const ratingHtml = reviewsCount > 0
+                    ? `<div class="mt-1 text-xs text-stone-500">★ ${rating.toFixed(1)} · ${formatReviewsCount(reviewsCount)}</div>`
+                    : `<div class="mt-1 text-xs text-stone-400">Нет отзывов</div>`;
                 
                 li.innerHTML = `
-                    <a href="/books/${b.id}" class="block">
-                        ${imageHtml}
-                        <div class="p-4">
+                    <div class="relative">
+                        <a href="/books/${b.id}" class="block">
+                            ${imageHtml}
+                        </a>
+                        <button
+                            type="button"
+                            class="catalog-fav-btn absolute right-2 top-2 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border bg-white/95 text-stone-600 shadow-sm backdrop-blur-sm transition-colors hover:text-red-600"
+                            data-book-id="${b.id}"
+                            title="Добавить в избранное"
+                            aria-label="Добавить в избранное"
+                        >
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <a href="/books/${b.id}" class="block p-4">
                             <h2 class="font-semibold text-stone-900 line-clamp-2">${escapeHtml(b.title)}</h2>
                             <p class="mt-1 text-sm text-stone-600">${escapeHtml(b.author)}</p>
-                            <p class="mt-3 text-lg font-medium text-amber-900">${formatPrice(b.price)}</p>
+                            ${ratingHtml}
+                            <div class="mt-3 flex items-center justify-between gap-3">
+                                <p class="text-lg font-medium text-amber-900">${formatPrice(b.price)}</p>
+                                <button type="button" class="catalog-cart-btn rounded-lg bg-amber-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-900 transition-colors" data-book-id="${b.id}">
+                                    В корзину
+                                </button>
+                            </div>
                             <div class="mt-2 flex flex-wrap gap-1">${genres}</div>
-                        </div>
                     </a>
                 `;
                 list.appendChild(li);
             }
+
+            updateCatalogButtons();
+
+            // Add event listeners for favorite and cart buttons
+            list.querySelectorAll('.catalog-fav-btn').forEach((btn) => {
+                btn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    if (!getToken()) {
+                        window.location.href = '/login';
+                        return;
+                    }
+                    
+                const bookId = Number(btn.getAttribute('data-book-id'));
+                    try {
+                    if (favoriteBookIds.has(bookId)) {
+                        await api(`/favorites/${bookId}`, { method: 'DELETE' });
+                        favoriteBookIds.delete(bookId);
+                        showAlert(alertEl, 'Книга удалена из избранного', 'success');
+                    } else {
+                        await api('/favorites', { method: 'POST', json: { book_id: bookId } });
+                        favoriteBookIds.add(bookId);
+                        showAlert(alertEl, 'Книга добавлена в избранное', 'success');
+                    }
+                        updateCatalogButtons();
+                    } catch (err) {
+                        const error = /** @type {any} */ (err);
+                        if (error.status === 409) {
+                            favoriteBookIds.add(bookId);
+                            updateCatalogButtons();
+                            showAlert(alertEl, 'Книга уже в избранном', 'success');
+                    } else if (error.status === 404) {
+                        favoriteBookIds.delete(bookId);
+                        updateCatalogButtons();
+                        showAlert(alertEl, 'Книги уже нет в избранном', 'success');
+                        } else {
+                        showAlert(alertEl, error.message || 'Ошибка обновления избранного');
+                        }
+                    }
+                });
+            });
+
+            list.querySelectorAll('.catalog-cart-btn').forEach((btn) => {
+                btn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    if (!getToken()) {
+                        window.location.href = '/login';
+                        return;
+                    }
+                    
+                    const bookId = Number(btn.getAttribute('data-book-id'));
+                    try {
+                    if (cartBookIds.has(bookId)) {
+                        const itemId = cartItemIdsByBookId.get(bookId);
+                        if (!itemId) {
+                            await loadUserState();
+                        }
+                        const actualItemId = cartItemIdsByBookId.get(bookId);
+                        if (!actualItemId) {
+                            throw new Error('Не удалось определить товар в корзине');
+                        }
+                        await api(`/cart/items/${actualItemId}`, { method: 'DELETE' });
+                        cartBookIds.delete(bookId);
+                        cartItemIdsByBookId.delete(bookId);
+                        showAlert(alertEl, 'Книга удалена из корзины', 'success');
+                    } else {
+                        const addRes = await api('/cart/items', { method: 'POST', json: { book_id: bookId, quantity: 1 } });
+                        cartBookIds.add(bookId);
+                        const itemId = addRes.data?.item?.id;
+                        if (itemId) {
+                            cartItemIdsByBookId.set(bookId, Number(itemId));
+                        }
+                        showAlert(alertEl, 'Книга добавлена в корзину', 'success');
+                    }
+                        void refreshCartBadge();
+                        updateCatalogButtons();
+                    } catch (err) {
+                        const error = /** @type {any} */ (err);
+                    if (error.status === 404) {
+                        cartBookIds.delete(bookId);
+                        cartItemIdsByBookId.delete(bookId);
+                        updateCatalogButtons();
+                        showAlert(alertEl, 'Книги уже нет в корзине', 'success');
+                        void refreshCartBadge();
+                    } else {
+                        showAlert(alertEl, error.message || 'Ошибка обновления корзины');
+                    }
+                    }
+                });
+            });
 
             if (pagination) {
                 renderPagination(pagEl, pagination, (p) => {
@@ -271,11 +665,24 @@ function initCatalog() {
         }
     }
 
-    void loadGenres().then(() => loadBooks());
+    void loadGenres().then(async () => {
+        await loadUserState();
+        await loadBooks();
+    });
 
     applyBtn?.addEventListener('click', () => {
-        page = 1;
-        void loadBooks();
+        const params = new URLSearchParams();
+        const genre = genreSelect.value;
+        if (genre) {
+            params.set('genre', genre);
+        }
+        const q = searchInput.value.trim();
+        if (q) {
+            params.set('search', q);
+        }
+
+        const queryString = params.toString();
+        window.location.href = queryString ? `/search?${queryString}` : '/search';
     });
 }
 
@@ -295,6 +702,9 @@ function initBookPage() {
 
     let reviewsPage = 1;
     let inFavorite = false;
+    let inCart = false;
+    /** @type {number|null} */
+    let cartItemId = null;
 
     async function checkFavorite() {
         if (!getToken()) {
@@ -322,6 +732,51 @@ function initBookPage() {
         }
         btn.classList.remove('hidden');
         btn.textContent = inFavorite ? 'Убрать из избранного' : 'В избранное';
+    }
+
+    async function checkCart() {
+        inCart = false;
+        cartItemId = null;
+        if (!getToken()) {
+            updateCartButton();
+            return;
+        }
+        try {
+            const res = await api('/cart');
+            const items = res.data?.cart?.items ?? [];
+            const line = items.find((item) => Number(item.book?.id) === Number(bookId));
+            if (line) {
+                inCart = true;
+                cartItemId = Number(line.id);
+            }
+        } catch {
+            inCart = false;
+            cartItemId = null;
+        }
+        updateCartButton();
+    }
+
+    function updateCartButton() {
+        const btn = document.getElementById('book-add-cart');
+        if (!btn) {
+            return;
+        }
+        if (!getToken()) {
+            btn.textContent = 'В корзину';
+            btn.classList.remove('bg-green-600', 'hover:bg-green-700');
+            btn.classList.add('bg-amber-800', 'hover:bg-amber-900');
+            return;
+        }
+
+        if (inCart) {
+            btn.textContent = 'В корзине';
+            btn.classList.remove('bg-amber-800', 'hover:bg-amber-900');
+            btn.classList.add('bg-green-600', 'hover:bg-green-700');
+        } else {
+            btn.textContent = 'В корзину';
+            btn.classList.remove('bg-green-600', 'hover:bg-green-700');
+            btn.classList.add('bg-amber-800', 'hover:bg-amber-900');
+        }
     }
 
     async function loadBook() {
@@ -392,6 +847,8 @@ function initBookPage() {
 
             await checkFavorite();
             updateFavButton();
+            await checkCart();
+            updateCartButton();
         } catch (e) {
             loading?.classList.add('hidden');
             showAlert(alertEl, e instanceof Error ? e.message : 'Ошибка загрузки');
@@ -440,14 +897,32 @@ function initBookPage() {
             showAlert(alertEl, 'Войдите, чтобы добавить товар в корзину.');
             return;
         }
-        const qtyInput = document.getElementById('book-qty');
-        const qty = Math.max(1, Number(qtyInput?.value) || 1);
         try {
-            await api('/cart/items', {
-                method: 'POST',
-                json: { book_id: Number(bookId), quantity: qty },
-            });
-            showAlert(alertEl, 'Добавлено в корзину.', 'success');
+            if (inCart) {
+                if (!cartItemId) {
+                    await checkCart();
+                }
+                if (!cartItemId) {
+                    throw new Error('Не удалось определить позицию в корзине');
+                }
+                await api(`/cart/items/${cartItemId}`, { method: 'DELETE' });
+                inCart = false;
+                cartItemId = null;
+                showAlert(alertEl, 'Книга удалена из корзины.', 'success');
+            } else {
+                const qtyInput = document.getElementById('book-qty');
+                const qty = Math.max(1, Number(qtyInput?.value) || 1);
+                const res = await api('/cart/items', {
+                    method: 'POST',
+                    json: { book_id: Number(bookId), quantity: qty },
+                });
+                inCart = true;
+                const addedItemId = res.data?.item?.id;
+                cartItemId = addedItemId ? Number(addedItemId) : null;
+                showAlert(alertEl, 'Добавлено в корзину.', 'success');
+            }
+            void refreshCartBadge();
+            updateCartButton();
         } catch (e) {
             showAlert(alertEl, e instanceof Error ? e.message : 'Ошибка');
         }
@@ -591,6 +1066,7 @@ function initCart() {
             const res = await api('/cart');
             const cart = res.data?.cart;
             const items = cart?.items ?? [];
+            void refreshCartBadge();
 
             loading?.classList.add('hidden');
 
@@ -630,6 +1106,7 @@ function initCart() {
                     try {
                         await api(`/cart/items/${id}`, { method: 'PATCH', json: { quantity: q } });
                         await loadCart();
+                        void refreshCartBadge();
                     } catch (e) {
                         showAlert(alertEl, e instanceof Error ? e.message : 'Ошибка');
                     }
@@ -642,6 +1119,7 @@ function initCart() {
                     try {
                         await api(`/cart/items/${id}`, { method: 'DELETE' });
                         await loadCart();
+                        void refreshCartBadge();
                     } catch (e) {
                         showAlert(alertEl, e instanceof Error ? e.message : 'Ошибка');
                     }
@@ -897,6 +1375,108 @@ function initFavorites() {
     void load();
 }
 
+function initReviews() {
+    const guest = document.getElementById('reviews-guest');
+    const loading = document.getElementById('reviews-loading');
+    const empty = document.getElementById('reviews-empty');
+    const list = document.getElementById('reviews-list');
+    const pagEl = document.getElementById('reviews-pagination');
+    const alertEl = document.getElementById('shop-alert');
+
+    if (!list || !pagEl) {
+        return;
+    }
+
+    if (!getToken()) {
+        guest?.classList.remove('hidden');
+        loading?.classList.add('hidden');
+        return;
+    }
+
+    let page = 1;
+
+    async function load() {
+        hideAlert(alertEl);
+        loading?.classList.remove('hidden');
+        empty?.classList.add('hidden');
+        list.classList.add('hidden');
+
+        try {
+            const res = await api(`/reviews?page=${page}&per_page=10`);
+            const reviews = res.data?.reviews ?? [];
+            const pagination = res.data?.pagination;
+
+            loading?.classList.add('hidden');
+
+            if (!reviews.length) {
+                empty?.classList.remove('hidden');
+                pagEl.classList.add('hidden');
+                return;
+            }
+
+            list.innerHTML = '';
+            list.classList.remove('hidden');
+
+            for (const r of reviews) {
+                const b = r.book;
+                const li = document.createElement('li');
+                li.className = 'rounded-xl border border-stone-200 bg-white p-4 shadow-sm';
+                li.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <a href="/books/${b.id}" class="font-semibold text-stone-900 hover:underline">${escapeHtml(b.title)}</a>
+                            <p class="mt-1 text-sm text-stone-600">${escapeHtml(b.author)}</p>
+                            <div class="mt-2 flex items-center gap-1">
+                                ${Array.from({ length: 5 }, (_, i) => `
+                                    <svg class="h-4 w-4 ${i < r.rating ? 'text-amber-400' : 'text-stone-300'}" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                    </svg>
+                                `).join('')}
+                                <span class="ml-2 text-sm text-stone-600">${formatDateTime(r.created_at)}</span>
+                            </div>
+                            ${r.comment ? `<p class="mt-2 text-stone-700">${escapeHtml(r.comment)}</p>` : ''}
+                        </div>
+                        <button type="button" data-review="${r.id}" class="ml-4 text-sm text-red-700 hover:underline">Удалить</button>
+                    </div>
+                `;
+                list.appendChild(li);
+            }
+
+            list.querySelectorAll('[data-review]').forEach((btn) => {
+                btn.addEventListener('click', async () => {
+                    const rid = btn.getAttribute('data-review');
+                    if (!confirm('Удалить этот отзыв?')) {
+                        return;
+                    }
+                    try {
+                        await api(`/reviews/${rid}`, { method: 'DELETE' });
+                        showAlert(alertEl, 'Отзыв удалён.', 'success');
+                        await load();
+                    } catch (e) {
+                        showAlert(alertEl, e instanceof Error ? e.message : 'Ошибка');
+                    }
+                });
+            });
+
+            if (pagination) {
+                renderPagination(pagEl, pagination, (p) => {
+                    page = p;
+                    void load();
+                });
+            }
+        } catch (e) {
+            loading?.classList.add('hidden');
+            if (/** @type {any} */ (e).status === 401) {
+                guest?.classList.remove('hidden');
+                return;
+            }
+            showAlert(alertEl, e instanceof Error ? e.message : 'Ошибка');
+        }
+    }
+
+    void load();
+}
+
 function initForgotPassword() {
     const form = document.getElementById('forgot-form');
     const alertEl = document.getElementById('shop-alert');
@@ -999,6 +1579,8 @@ function initSettings() {
             }
             if (emailEl && u?.email) {
                 emailEl.value = u.email;
+                emailEl.readOnly = true;
+                emailEl.classList.add('bg-gray-100', 'cursor-not-allowed');
             }
         } catch {
             window.location.href = '/login';
@@ -1014,7 +1596,6 @@ function initSettings() {
                 method: 'PATCH',
                 json: {
                     name: String(fd.get('name') ?? ''),
-                    email: String(fd.get('email') ?? ''),
                 },
             });
             showAlert(alertEl, 'Профиль сохранён.', 'success');
@@ -1067,7 +1648,196 @@ function initSettings() {
     void loadProfile();
 }
 
+function initSearch() {
+    const form = document.getElementById('search-form');
+    const resultsEl = document.getElementById('search-results');
+    const loadingEl = document.getElementById('search-loading');
+    const paginationEl = document.getElementById('search-pagination');
+    const alertEl = document.getElementById('shop-alert');
+
+    if (!form || !resultsEl) {
+        return;
+    }
+
+    // Initialize form from URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const searchInput = document.getElementById('search');
+    const genreSelect = document.getElementById('genre');
+    const authorSelect = document.getElementById('author');
+    const minPriceInput = document.getElementById('min_price');
+    const maxPriceInput = document.getElementById('max_price');
+    const ratingSelect = document.getElementById('min_rating');
+    const inStockCheckbox = document.getElementById('in_stock');
+    const publishedAfterInput = document.getElementById('published_after');
+    const publishedBeforeInput = document.getElementById('published_before');
+    const yearInput = document.getElementById('year');
+    const sortSelect = document.getElementById('sort');
+
+    if (searchInput) searchInput.value = urlParams.get('search') || '';
+    if (genreSelect) genreSelect.value = urlParams.get('genre') || '';
+    if (authorSelect) authorSelect.value = urlParams.get('author') || '';
+    if (minPriceInput) minPriceInput.value = urlParams.get('min_price') || '';
+    if (maxPriceInput) maxPriceInput.value = urlParams.get('max_price') || '';
+    if (ratingSelect) ratingSelect.value = urlParams.get('min_rating') || '';
+    if (inStockCheckbox) inStockCheckbox.checked = urlParams.get('in_stock') === '1';
+    if (publishedAfterInput) publishedAfterInput.value = urlParams.get('published_after') || '';
+    if (publishedBeforeInput) publishedBeforeInput.value = urlParams.get('published_before') || '';
+    if (yearInput) yearInput.value = urlParams.get('year') || '';
+    if (sortSelect) sortSelect.value = urlParams.get('sort') || 'title';
+
+    async function loadResults(page = 1) {
+        hideAlert(alertEl);
+        loadingEl?.classList.remove('hidden');
+        resultsEl.classList.add('hidden');
+        paginationEl?.classList.add('hidden');
+
+        try {
+            const params = new URLSearchParams();
+            const fd = new FormData(form);
+
+            // Add form data to params
+            for (const [key, value] of fd.entries()) {
+                if (key === 'in_stock') {
+                    // Handle checkbox specially - send '1' if checked, skip if unchecked
+                    if (inStockCheckbox?.checked) {
+                        params.set(key, '1');
+                    }
+                } else if (value && String(value).trim()) {
+                    params.set(key, String(value));
+                }
+            }
+
+            // Add page
+            params.set('page', String(page));
+
+            // Update URL without reloading
+            const newUrl = `${window.location.pathname}?${params.toString()}`;
+            window.history.replaceState({}, '', newUrl);
+
+            const res = await api(`/books?${params.toString()}`);
+            const books = res.data?.books ?? [];
+            const meta = res.data?.pagination;
+
+            // Render results
+            resultsEl.innerHTML = books.map(book => `
+                <div class="bg-white rounded-lg shadow-sm border p-4 hover:shadow-md transition-shadow">
+                    <div class="flex gap-4">
+                        <div class="flex-shrink-0">
+                            <img src="${escapeHtml(book.cover_url || '/images/no-cover.jpg')}" 
+                                 alt="${escapeHtml(book.title)}" 
+                                 class="w-20 h-28 object-cover rounded">
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="font-semibold text-lg mb-1">
+                                <a href="/books/${book.id}" class="hover:text-blue-600">
+                                    ${escapeHtml(book.title)}
+                                </a>
+                            </h3>
+                            <p class="text-gray-600 mb-2">
+                                Автор: ${escapeHtml(book.author_data?.name || 'Не указан')}
+                            </p>
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="flex items-center">
+                                    ${Array.from({length: 5}, (_, i) => 
+                                        `<span class="${i < Math.floor(book.average_rating || 0) ? 'text-yellow-400' : 'text-gray-300'}">★</span>`
+                                    ).join('')}
+                                </div>
+                                <span class="text-sm text-gray-600">
+                                    (${book.reviews_count || 0} отзывов)
+                                </span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xl font-bold text-blue-600">
+                                    ${formatPrice(book.price)}
+                                </span>
+                                <span class="text-sm text-gray-600">
+                                    ${book.stock > 0 ? `${book.stock} шт.` : 'Нет в наличии'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Handle empty state
+            const emptyEl = document.getElementById('search-empty');
+            if (books.length === 0) {
+                emptyEl?.classList.remove('hidden');
+            } else {
+                emptyEl?.classList.add('hidden');
+            }
+
+            // Render pagination
+            if (meta && meta.last_page > 1) {
+                const pages = [];
+                const current = meta.current_page;
+                const last = meta.last_page;
+
+                // Previous button
+                if (current > 1) {
+                    pages.push(`<button class="px-3 py-1 border rounded hover:bg-gray-50" data-page="${current - 1}">‹</button>`);
+                }
+
+                // Page numbers
+                for (let i = Math.max(1, current - 2); i <= Math.min(last, current + 2); i++) {
+                    pages.push(`<button class="px-3 py-1 border rounded hover:bg-gray-50 ${i === current ? 'bg-blue-500 text-white' : ''}" data-page="${i}">${i}</button>`);
+                }
+
+                // Next button
+                if (current < last) {
+                    pages.push(`<button class="px-3 py-1 border rounded hover:bg-gray-50" data-page="${current + 1}">›</button>`);
+                }
+
+                paginationEl.innerHTML = pages.join('');
+                paginationEl.classList.remove('hidden');
+            }
+
+            resultsEl.classList.remove('hidden');
+        } catch (e) {
+            showAlert(alertEl, e instanceof Error ? e.message : 'Ошибка загрузки результатов');
+        } finally {
+            loadingEl?.classList.add('hidden');
+        }
+    }
+
+    // Form change handler
+    form.addEventListener('change', () => {
+        loadResults(1);
+    });
+
+    // Search input handler (debounced)
+    let searchTimeout;
+    searchInput?.addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => loadResults(1), 300);
+    });
+
+    // Pagination handler
+    paginationEl?.addEventListener('click', (e) => {
+        const button = e.target.closest('button[data-page]');
+        if (button) {
+            const page = Number(button.dataset.page);
+            loadResults(page);
+        }
+    });
+
+    // Clear filters handler
+    const clearBtn = document.getElementById('clear-filters');
+    clearBtn?.addEventListener('click', () => {
+        // Reset all form fields
+        form.reset();
+        // Clear URL parameters
+        window.history.replaceState({}, '', window.location.pathname);
+        // Reload results
+        loadResults(1);
+    });
+
+    // Initial load
+    loadResults();
+}
+
 export function initShop() {
+    initAlertClose();
     initNav();
 
     const page = document.body.dataset.page;
@@ -1104,6 +1874,12 @@ export function initShop() {
             break;
         case 'favorites':
             initFavorites();
+            break;
+        case 'reviews':
+            initReviews();
+            break;
+        case 'search':
+            initSearch();
             break;
         default:
             break;

@@ -40,6 +40,25 @@ class ReviewController extends Controller
     }
 
     /**
+     * List reviews for the authenticated user.
+     */
+    public function userReviews(Request $request): JsonResponse
+    {
+        $perPage = (int) ($request->query('per_page') ?? 15);
+        $paginator = $this->reviewService->paginateForUser($request->user(), $perPage);
+
+        return ApiResponse::success([
+            'reviews' => ReviewResource::collection($paginator->items()),
+            'pagination' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ], 'Ваши отзывы');
+    }
+
+    /**
      * Create a review for a book.
      */
     public function store(StoreReviewRequest $request): JsonResponse

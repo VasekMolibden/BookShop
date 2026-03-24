@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'title',
     'slug',
     'author',
+    'author_id',
     'description',
     'price',
     'isbn',
@@ -68,5 +69,23 @@ class Book extends Model
     public function images(): HasMany
     {
         return $this->hasMany(BookImage::class)->orderBy('sort_order');
+    }
+
+    /**
+     * Author of this book.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<Author, $this>
+     */
+    public function author(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Author::class);
+    }
+
+    /**
+     * Get the average rating for this book.
+     */
+    public function getAverageRatingAttribute(): ?float
+    {
+        return $this->reviews()->avg('rating');
     }
 }

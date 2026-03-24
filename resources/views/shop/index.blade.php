@@ -12,7 +12,7 @@
         </div>
     </div>
 
-    <div class="mb-6 flex flex-col gap-4 rounded-xl border border-stone-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center">
+    <div class="mb-6 flex flex-col gap-4 rounded-xl border border-stone-200 bg-white p-4 shadow-sm sm:flex-row sm:items-end">
         <label class="flex flex-1 flex-col gap-1 text-sm">
             <span class="font-medium text-stone-700">Поиск</span>
             <input type="search" id="catalog-search" placeholder="Название или автор…" class="rounded-lg border border-stone-300 px-3 py-2 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600">
@@ -23,7 +23,7 @@
                 <option value="">Все жанры</option>
             </select>
         </label>
-        <button type="button" id="catalog-apply" class="mt-6 rounded-lg bg-amber-800 px-4 py-2 text-sm font-medium text-white hover:bg-amber-900 sm:mt-0">Применить</button>
+        <button type="button" id="catalog-apply" class="self-start rounded-lg bg-amber-800 px-4 py-2 text-sm font-medium text-white hover:bg-amber-900 sm:self-auto">Применить</button>
     </div>
 
     <div id="catalog-loading" class="text-stone-500">Загрузка…</div>

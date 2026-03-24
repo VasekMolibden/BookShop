@@ -4,6 +4,8 @@ namespace Database\Seeders;
 
 use App\Models\Book;
 use App\Models\Genre;
+use App\Models\Review;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
@@ -97,6 +99,45 @@ class CatalogSeeder extends Seeder
             );
 
             $book->genres()->sync(collect($genres)->pluck('id')->all());
+        }
+
+        // Add some test reviews
+        $user = User::query()->where('email', 'user@bookshop.test')->first();
+        if ($user) {
+            $reviews = [
+                [
+                    'book_slug' => 'voyna-i-mir',
+                    'rating' => 5,
+                    'comment' => 'Великолепное произведение! Обязательно к прочтению.',
+                ],
+                [
+                    'book_slug' => 'prestuplenie-i-nakazanie',
+                    'rating' => 4,
+                    'comment' => 'Тяжелая, но очень глубокая книга.',
+                ],
+                [
+                    'book_slug' => 'sapiens',
+                    'rating' => 5,
+                    'comment' => 'Интересный взгляд на историю человечества.',
+                ],
+                [
+                    'book_slug' => 'malenkiy-prints',
+                    'rating' => 5,
+                    'comment' => 'Классика! Читал в детстве, теперь дочке читаю.',
+                ],
+            ];
+
+            foreach ($reviews as $reviewData) {
+                $book = Book::query()->where('slug', $reviewData['book_slug'])->first();
+                if ($book && !Review::query()->where('user_id', $user->id)->where('book_id', $book->id)->exists()) {
+                    Review::query()->create([
+                        'user_id' => $user->id,
+                        'book_id' => $book->id,
+                        'rating' => $reviewData['rating'],
+                        'comment' => $reviewData['comment'],
+                    ]);
+                }
+            }
         }
     }
 }

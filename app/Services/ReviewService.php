@@ -25,6 +25,20 @@ class ReviewService
     }
 
     /**
+     * Paginate reviews for a user (newest first).
+     */
+    public function paginateForUser(User $user, int $perPage = 15): LengthAwarePaginator
+    {
+        $perPage = min(max($perPage, 1), 100);
+
+        return Review::query()
+            ->where('user_id', $user->id)
+            ->with(['book:id,title,author,author_id', 'book.author:id,name,slug'])
+            ->orderByDesc('id')
+            ->paginate($perPage);
+    }
+
+    /**
      * Create a review (one per user per book).
      *
      * @param  array{rating: int, comment: string|null}  $data

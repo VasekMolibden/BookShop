@@ -7,6 +7,7 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class AuthService
 {
@@ -93,7 +94,14 @@ class AuthService
      */
     public function updateProfile(User $user, array $data): User
     {
-        $user->fill($data);
+        if (isset($data['email']) && $data['email'] !== $user->email) {
+            throw ValidationException::withMessages([
+                'email' => ['Изменение email запрещено.'],
+            ]);
+        }
+
+        // Only name can be changed here (email is immutable for now)
+        $user->fill(array_filter($data, fn ($value, $key) => $key === 'name', ARRAY_FILTER_USE_BOTH));
         $user->save();
 
         return $user->fresh();

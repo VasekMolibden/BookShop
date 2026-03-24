@@ -16,7 +16,7 @@ class AdminOrderService
         $perPage = min(max($perPage, 1), 100);
 
         return Order::query()
-            ->with(['user:id,name,email', 'items.book:id,title,author'])
+            ->with(['user:id,name,email', 'items.book:id,title,author,author_id', 'items.book.author:id,name,slug', 'items.book.genres:id,name,slug'])
             ->orderByDesc('id')
             ->paginate($perPage);
     }
@@ -29,6 +29,6 @@ class AdminOrderService
         $order->status = $status;
         $order->save();
 
-        return $order->fresh(['items.book.genres']);
+        return $order->fresh(['items.book.genres', 'items.book.author']);
     }
 }

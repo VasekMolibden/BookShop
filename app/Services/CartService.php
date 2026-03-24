@@ -16,7 +16,7 @@ class CartService
     public function getCart(User $user): Cart
     {
         $cart = $this->getOrCreateCart($user);
-        $cart->load(['items.book.genres']);
+        $cart->load(['items.book.genres', 'items.book.author']);
 
         return $cart;
     }
@@ -50,14 +50,14 @@ class CartService
             $existing->quantity = $newQuantity;
             $existing->save();
 
-            return $existing->load(['book.genres']);
+            return $existing->load(['book.genres', 'book.author']);
         }
 
         return CartItem::query()->create([
             'cart_id' => $cart->id,
             'book_id' => $bookId,
             'quantity' => $quantity,
-        ])->load(['book.genres']);
+        ])->load(['book.genres', 'book.author']);
     }
 
     /**
@@ -80,7 +80,7 @@ class CartService
         $item->quantity = $quantity;
         $item->save();
 
-        return $item->fresh(['book.genres']);
+        return $item->fresh(['book.genres', 'book.author']);
     }
 
     /**

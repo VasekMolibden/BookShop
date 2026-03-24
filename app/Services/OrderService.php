@@ -23,7 +23,7 @@ class OrderService
 
         return Order::query()
             ->where('user_id', $user->id)
-            ->with(['items.book.genres'])
+            ->with(['items.book.genres', 'items.book.author'])
             ->orderByDesc('id')
             ->paginate($perPage);
     }
