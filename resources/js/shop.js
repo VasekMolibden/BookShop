@@ -519,8 +519,8 @@ function initCatalog() {
                         .join(' ') || '';
                 
                 const imageHtml = b.primary_image && b.primary_image.url 
-                    ? `<img src="${b.primary_image.url}" alt="${escapeHtml(b.primary_image.alt_text || b.title)}" class="w-full h-48 object-cover">`
-                    : `<div class="w-full h-48 bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center text-4xl">📖</div>`;
+                    ? `<img src="${b.primary_image.url}" alt="${escapeHtml(b.primary_image.alt_text || b.title)}" class="w-full h-64 object-contain bg-stone-50">`
+                    : `<div class="w-full h-64 bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center text-4xl">📖</div>`;
                 const rating = Number(b.average_rating ?? 0);
                 const reviewsCount = Number(b.reviews_count ?? 0);
                 const ratingHtml = reviewsCount > 0
