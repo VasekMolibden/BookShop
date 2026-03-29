@@ -74,20 +74,12 @@ class AppServiceProvider extends ServiceProvider
 
         Route::bind('order', function (string $value) {
             $order = Order::query()
-                ->with(['items.book.genres'])
+                ->with(['items.book.genres', 'payment'])
                 ->whereKey($value)
                 ->firstOrFail();
 
-            $user = auth()->user();
-
-            if ($user && $user->is_admin) {
-                return $order;
-            }
-
-            if ((int) auth()->id() !== (int) $order->user_id) {
-                abort(404);
-            }
-
+            // For web routes (Blade views), allow access - the API will handle authorization
+            // via Bearer token when loading order details
             return $order;
         });
 

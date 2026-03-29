@@ -93,6 +93,7 @@ class ShopController extends Controller
      */
     public function order(Order $order): View
     {
+        // Order data is loaded via API, just pass the order ID
         return view('shop.order', ['orderId' => $order->id]);
     }
 

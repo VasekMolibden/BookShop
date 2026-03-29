@@ -231,6 +231,94 @@ async function refreshCartBadge() {
     }
 }
 
+// Global state for favorite and cart books
+/** @type {Set<number>} */
+let favoriteBookIds = new Set();
+/** @type {Set<number>} */
+let cartBookIds = new Set();
+/** @type {Map<number, number>} */
+let cartItemIdsByBookId = new Map();
+
+/**
+ * Load user's favorite and cart items
+ */
+async function loadUserState() {
+    favoriteBookIds = new Set();
+    cartBookIds = new Set();
+    cartItemIdsByBookId = new Map();
+
+    if (!getToken()) {
+        return;
+    }
+
+    try {
+        const [favRes, cartRes] = await Promise.all([
+            api('/favorites?per_page=100'),
+            api('/cart'),
+        ]);
+
+        const favs = favRes.data?.favorites ?? [];
+        for (const fav of favs) {
+            favoriteBookIds.add(Number(fav.book_id));
+        }
+
+        const cartItems = cartRes.data?.items ?? [];
+        for (const item of cartItems) {
+            cartBookIds.add(Number(item.book_id));
+            cartItemIdsByBookId.set(Number(item.book_id), Number(item.id));
+        }
+    } catch {
+        // Silently fail if we can't load user state
+    }
+}
+
+/**
+ * Update catalog button states (used by both catalog and search pages)
+ */
+function updateCatalogButtons() {
+    document.querySelectorAll('.catalog-fav-btn').forEach((btn) => {
+        const bookId = Number(btn.getAttribute('data-book-id'));
+        if (favoriteBookIds.has(bookId)) {
+            btn.innerHTML = `
+                <svg class="h-5 w-5 text-red-600" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                </svg>
+            `;
+            btn.setAttribute('title', 'Убрать из избранного');
+            btn.setAttribute('aria-label', 'Убрать из избранного');
+            btn.classList.add('text-red-600', 'bg-red-50/95', 'border-red-200');
+            btn.classList.remove('bg-white/95', 'border-white/80');
+            btn.disabled = false;
+        } else {
+            btn.innerHTML = `
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                </svg>
+            `;
+            btn.setAttribute('title', 'Добавить в избранное');
+            btn.setAttribute('aria-label', 'Добавить в избранное');
+            btn.classList.remove('text-red-600', 'bg-red-50/95', 'border-red-200');
+            btn.classList.add('bg-white/95', 'border-white/80');
+            btn.disabled = false;
+        }
+    });
+
+    document.querySelectorAll('.catalog-cart-btn').forEach((btn) => {
+        const bookId = Number(btn.getAttribute('data-book-id'));
+        if (cartBookIds.has(bookId)) {
+            btn.textContent = 'В корзине';
+            btn.classList.remove('bg-amber-800', 'hover:bg-amber-900');
+            btn.classList.add('bg-green-600', 'hover:bg-green-700');
+            btn.disabled = false;
+        } else {
+            btn.textContent = 'В корзину';
+            btn.classList.remove('bg-green-600', 'hover:bg-green-700');
+            btn.classList.add('bg-amber-800', 'hover:bg-amber-900');
+            btn.disabled = false;
+        }
+    });
+}
+
 function initNav() {
     void refreshNav();
 
@@ -377,92 +465,6 @@ function initCatalog() {
 
     let page = 1;
     const perPage = 12;
-    let favoriteBookIds = new Set();
-    let cartBookIds = new Set();
-    /** @type {Map<number, number>} */
-    let cartItemIdsByBookId = new Map();
-
-    async function loadUserState() {
-        favoriteBookIds = new Set();
-        cartBookIds = new Set();
-        cartItemIdsByBookId = new Map();
-
-        if (!getToken()) {
-            return;
-        }
-
-        try {
-            const [favRes, cartRes] = await Promise.all([
-                api('/favorites?per_page=100'),
-                api('/cart'),
-            ]);
-
-            const favs = favRes.data?.favorites ?? [];
-            for (const f of favs) {
-                if (f.book?.id) {
-                    favoriteBookIds.add(Number(f.book.id));
-                }
-            }
-
-            const cart = cartRes.data?.cart;
-            const items = cart?.items ?? [];
-            for (const item of items) {
-                if (item.book?.id) {
-                    const bookId = Number(item.book.id);
-                    cartBookIds.add(bookId);
-                    if (item.id) {
-                        cartItemIdsByBookId.set(bookId, Number(item.id));
-                    }
-                }
-            }
-        } catch {
-            // ignore
-        }
-    }
-
-    function updateCatalogButtons() {
-        list.querySelectorAll('.catalog-fav-btn').forEach((btn) => {
-            const bookId = Number(btn.getAttribute('data-book-id'));
-            if (favoriteBookIds.has(bookId)) {
-                btn.innerHTML = `
-                    <svg class="h-5 w-5 text-red-600" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-                    </svg>
-                `;
-                btn.setAttribute('title', 'Убрать из избранного');
-                btn.setAttribute('aria-label', 'Убрать из избранного');
-                btn.classList.add('text-red-600', 'bg-red-50/95', 'border-red-200');
-                btn.classList.remove('bg-white/95', 'border-white/80');
-                btn.disabled = false;
-            } else {
-                btn.innerHTML = `
-                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-                    </svg>
-                `;
-                btn.setAttribute('title', 'Добавить в избранное');
-                btn.setAttribute('aria-label', 'Добавить в избранное');
-                btn.classList.remove('text-red-600', 'bg-red-50/95', 'border-red-200');
-                btn.classList.add('bg-white/95', 'border-white/80');
-                btn.disabled = false;
-            }
-        });
-
-        list.querySelectorAll('.catalog-cart-btn').forEach((btn) => {
-            const bookId = Number(btn.getAttribute('data-book-id'));
-            if (cartBookIds.has(bookId)) {
-                btn.textContent = 'В корзине';
-                btn.classList.remove('bg-amber-800', 'hover:bg-amber-900');
-                btn.classList.add('bg-green-600', 'hover:bg-green-700');
-                btn.disabled = false;
-            } else {
-                btn.textContent = 'В корзину';
-                btn.classList.remove('bg-green-600', 'hover:bg-green-700');
-                btn.classList.add('bg-amber-800', 'hover:bg-amber-900');
-                btn.disabled = false;
-            }
-        });
-    }
 
     async function loadGenres() {
         const res = await api('/genres', { auth: false });
@@ -1138,7 +1140,12 @@ function initCart() {
     document.getElementById('cart-checkout')?.addEventListener('click', async () => {
         hideAlert(alertEl);
         try {
-            await api('/orders/checkout', { method: 'POST', json: {} });
+            const res = await api('/orders/checkout', { method: 'POST', json: {} });
+            const paymentUrl = res.data?.payment?.payment_url;
+            if (paymentUrl) {
+                window.location.href = paymentUrl;
+                return;
+            }
             window.location.href = '/orders';
         } catch (e) {
             showAlert(alertEl, e instanceof Error ? e.message : 'Не удалось оформить заказ');
@@ -1193,14 +1200,38 @@ function initOrders() {
             for (const o of orders) {
                 const li = document.createElement('li');
                 li.className = 'rounded-xl border border-stone-200 bg-white p-4 shadow-sm';
+                const cancelBtn = o.status === 'pending'
+                    ? `<button type="button" class="ml-2 text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200" data-cancel-order="${o.id}">Отменить</button>`
+                    : '';
                 li.innerHTML = `
                     <a href="/orders/${o.id}" class="font-medium text-amber-900 hover:underline">Заказ №${o.id}</a>
                     <span class="ml-2 rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-700">${escapeHtml(o.status)}</span>
+                    ${cancelBtn}
                     <p class="mt-1 text-sm text-stone-600">${formatDateTime(o.created_at)}</p>
                     <p class="mt-2 font-semibold text-stone-900">${formatPrice(o.total)}</p>
                 `;
                 list.appendChild(li);
             }
+
+            // Attach cancel button handlers
+            list.querySelectorAll('[data-cancel-order]').forEach((btn) => {
+                btn.addEventListener('click', async () => {
+                    const orderId = btn.getAttribute('data-cancel-order');
+                    if (!confirm('Вы уверены, что хотите отменить этот заказ?')) {
+                        return;
+                    }
+                    try {
+                        await api(`/orders/${orderId}`, { 
+                            method: 'PATCH', 
+                            json: { status: 'cancelled' } 
+                        });
+                        showAlert(alertEl, 'Заказ отменён', 'success');
+                        await load();
+                    } catch (e) {
+                        showAlert(alertEl, e instanceof Error ? e.message : 'Ошибка отмены');
+                    }
+                });
+            });
 
             if (pagination) {
                 renderPagination(pagEl, pagination, (p) => {
@@ -1719,45 +1750,54 @@ function initSearch() {
             const meta = res.data?.pagination;
 
             // Render results
-            resultsEl.innerHTML = books.map(book => `
-                <div class="bg-white rounded-lg shadow-sm border p-4 hover:shadow-md transition-shadow">
-                    <div class="flex gap-4">
-                        <div class="flex-shrink-0">
-                            <img src="${escapeHtml(book.cover_url || '/images/no-cover.jpg')}" 
-                                 alt="${escapeHtml(book.title)}" 
-                                 class="w-20 h-28 object-cover rounded">
+            resultsEl.innerHTML = books.map(book => {
+                const genres = (book.genres ?? [])
+                    .map((g) => `<span class="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-900">${escapeHtml(g.name)}</span>`)
+                    .join(' ') || '';
+                
+                const imageHtml = book.primary_image && book.primary_image.url 
+                    ? `<img src="${book.primary_image.url}" alt="${escapeHtml(book.primary_image.alt_text || book.title)}" class="w-full h-64 object-contain bg-stone-50">`
+                    : `<div class="w-full h-64 bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center text-4xl">📖</div>`;
+                
+                const rating = Number(book.average_rating ?? 0);
+                const reviewsCount = Number(book.reviews_count ?? 0);
+                const ratingHtml = reviewsCount > 0
+                    ? `<div class="mt-1 text-xs text-stone-500">★ ${rating.toFixed(1)} · ${formatReviewsCount(reviewsCount)}</div>`
+                    : `<div class="mt-1 text-xs text-stone-400">Нет отзывов</div>`;
+                
+                return `
+                    <div class="rounded-xl border border-stone-200 bg-white overflow-hidden shadow-sm transition hover:border-amber-300">
+                        <div class="relative">
+                            <a href="/books/${book.id}" class="block">
+                                ${imageHtml}
+                            </a>
+                            <button
+                                type="button"
+                                class="catalog-fav-btn absolute right-2 top-2 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border bg-white/95 text-stone-600 shadow-sm backdrop-blur-sm transition-colors hover:text-red-600"
+                                data-book-id="${book.id}"
+                                title="Добавить в избранное"
+                                aria-label="Добавить в избранное"
+                            >
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                                </svg>
+                            </button>
                         </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="font-semibold text-lg mb-1">
-                                <a href="/books/${book.id}" class="hover:text-blue-600">
-                                    ${escapeHtml(book.title)}
-                                </a>
-                            </h3>
-                            <p class="text-gray-600 mb-2">
-                                Автор: ${escapeHtml(book.author_data?.name || 'Не указан')}
-                            </p>
-                            <div class="flex items-center gap-2 mb-2">
-                                <div class="flex items-center">
-                                    ${Array.from({length: 5}, (_, i) => 
-                                        `<span class="${i < Math.floor(book.average_rating || 0) ? 'text-yellow-400' : 'text-gray-300'}">★</span>`
-                                    ).join('')}
-                                </div>
-                                <span class="text-sm text-gray-600">
-                                    (${book.reviews_count || 0} отзывов)
-                                </span>
+                        <a href="/books/${book.id}" class="block p-4">
+                            <h2 class="font-semibold text-stone-900 line-clamp-2">${escapeHtml(book.title)}</h2>
+                            <p class="mt-1 text-sm text-stone-600">${escapeHtml(book.author)}</p>
+                            ${ratingHtml}
+                            <div class="mt-3 flex items-center justify-between gap-3">
+                                <p class="text-lg font-medium text-amber-900">${formatPrice(book.price)}</p>
+                                <button type="button" class="catalog-cart-btn rounded-lg bg-amber-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-900 transition-colors" data-book-id="${book.id}">
+                                    В корзину
+                                </button>
                             </div>
-                            <div class="flex items-center justify-between">
-                                <span class="text-xl font-bold text-blue-600">
-                                    ${formatPrice(book.price)}
-                                </span>
-                                <span class="text-sm text-gray-600">
-                                    ${book.stock > 0 ? `${book.stock} шт.` : 'Нет в наличии'}
-                                </span>
-                            </div>
-                        </div>
+                            <div class="mt-2 flex flex-wrap gap-1">${genres}</div>
+                        </a>
                     </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
 
             // Handle empty state
             const emptyEl = document.getElementById('search-empty');
@@ -1793,6 +1833,105 @@ function initSearch() {
             }
 
             resultsEl.classList.remove('hidden');
+
+            // Add event listeners for favorite and cart buttons
+            resultsEl.querySelectorAll('.catalog-fav-btn').forEach((btn) => {
+                btn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    if (!getToken()) {
+                        window.location.href = '/login';
+                        return;
+                    }
+                    
+                    const bookId = Number(btn.getAttribute('data-book-id'));
+                    try {
+                        if (favoriteBookIds.has(bookId)) {
+                            await api(`/favorites/${bookId}`, { method: 'DELETE' });
+                            favoriteBookIds.delete(bookId);
+                            showAlert(alertEl, 'Книга удалена из избранного', 'success');
+                        } else {
+                            await api('/favorites', { method: 'POST', json: { book_id: bookId } });
+                            favoriteBookIds.add(bookId);
+                            showAlert(alertEl, 'Книга добавлена в избранное', 'success');
+                        }
+                        await updateSearchButtons();
+                    } catch (err) {
+                        const error = /** @type {any} */ (err);
+                        if (error.status === 409) {
+                            favoriteBookIds.add(bookId);
+                            await updateSearchButtons();
+                            showAlert(alertEl, 'Книга уже в избранном', 'success');
+                        } else if (error.status === 404) {
+                            favoriteBookIds.delete(bookId);
+                            await updateSearchButtons();
+                            showAlert(alertEl, 'Книги уже нет в избранном', 'success');
+                        } else {
+                            showAlert(alertEl, error.message || 'Ошибка обновления избранного');
+                        }
+                    }
+                });
+            });
+
+            resultsEl.querySelectorAll('.catalog-cart-btn').forEach((btn) => {
+                btn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    if (!getToken()) {
+                        window.location.href = '/login';
+                        return;
+                    }
+                    
+                    const bookId = Number(btn.getAttribute('data-book-id'));
+                    try {
+                        if (cartBookIds.has(bookId)) {
+                            const itemId = cartItemIdsByBookId.get(bookId);
+                            if (!itemId) {
+                                await loadUserState();
+                            }
+                            const actualItemId = cartItemIdsByBookId.get(bookId);
+                            if (!actualItemId) {
+                                throw new Error('Не удалось определить товар в корзине');
+                            }
+                            await api(`/cart/items/${actualItemId}`, { method: 'DELETE' });
+                            cartBookIds.delete(bookId);
+                            cartItemIdsByBookId.delete(bookId);
+                            showAlert(alertEl, 'Книга удалена из корзины', 'success');
+                        } else {
+                            const addRes = await api('/cart/items', { method: 'POST', json: { book_id: bookId, quantity: 1 } });
+                            cartBookIds.add(bookId);
+                            const itemId = addRes.data?.item?.id;
+                            if (itemId) {
+                                cartItemIdsByBookId.set(bookId, Number(itemId));
+                            }
+                            showAlert(alertEl, 'Книга добавлена в корзину', 'success');
+                        }
+                        void refreshCartBadge();
+                        await updateSearchButtons();
+                    } catch (err) {
+                        const error = /** @type {any} */ (err);
+                        if (error.status === 404) {
+                            cartBookIds.delete(bookId);
+                            cartItemIdsByBookId.delete(bookId);
+                            await updateSearchButtons();
+                            showAlert(alertEl, 'Книги уже нет в корзине', 'success');
+                            void refreshCartBadge();
+                        } else {
+                            showAlert(alertEl, error.message || 'Ошибка обновления корзины');
+                        }
+                    }
+                });
+            });
+
+            // Helper function to update button states on the search page
+            async function updateSearchButtons() {
+                updateCatalogButtons();
+            }
+
+            // Update button states after rendering
+            await updateSearchButtons();
         } catch (e) {
             showAlert(alertEl, e instanceof Error ? e.message : 'Ошибка загрузки результатов');
         } finally {
@@ -1833,7 +1972,9 @@ function initSearch() {
     });
 
     // Initial load
-    loadResults();
+    void loadUserState().then(() => {
+        loadResults();
+    });
 }
 
 export function initShop() {

@@ -20,10 +20,12 @@ class BookListResource extends JsonResource
     {
         $primaryImage = $this->images->firstWhere('is_primary', true) ?? $this->images->first();
 
-        // Get author name from database field or relation
-        $authorName = $this->getRawOriginal('author');
-        if (!$authorName && $this->relationLoaded('author') && $this->author) {
+        // Get author name - prefer author relation if loaded, otherwise use author string field
+        $authorName = null;
+        if ($this->relationLoaded('author') && is_object($this->author) && method_exists($this->author, 'getAttribute')) {
             $authorName = $this->author->name;
+        } else {
+            $authorName = $this->getAttribute('author');
         }
 
         return [
@@ -31,7 +33,10 @@ class BookListResource extends JsonResource
             'title' => $this->title,
             'slug' => $this->slug,
             'author' => $authorName ?: 'Неизвестный автор',
-            'author_data' => $this->when($this->relationLoaded('author'), AuthorResource::make($this->getRelation('author'))),
+            'author_data' => $this->when(
+                $this->relationLoaded('author') && is_object($this->author),
+                new AuthorResource($this->author)
+            ),
             'price' => $this->price,
             'stock' => $this->stock,
             'published_at' => $this->published_at?->toDateString(),

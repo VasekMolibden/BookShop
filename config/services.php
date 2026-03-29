@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'yookassa' => [
+        'shop_id' => env('YOOKASSA_SHOP_ID'),
+        'api_key' => env('YOOKASSA_API_KEY'),
+        'webhook_secret' => env('YOOKASSA_WEBHOOK_SECRET'),
+    ],
+
 ];
